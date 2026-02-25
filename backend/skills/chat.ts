@@ -1,10 +1,12 @@
 // skills/chat.ts
 
 import type { Request, Response } from "express";
-import { GoogleGenAI } from "@google/genai";
 import type { ChatSkillData } from "../shared/types";
 
-// ── System Prompt ─────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || "sU1AQGNMOauUO57PAXSUzfY8uPWMucPP";
+const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
 
 const SYSTEM_PROMPT = `You are a professional crypto market analyst working for Pinion Signal Agent.
 You analyze on-chain token price data and produce clear, concise market intelligence reports.
@@ -16,38 +18,52 @@ You always structure your response as:
 Keep your total response under 150 words.
 Be direct and professional. No disclaimers, no fluff.`;
 
-// ── Gemini Client ─────────────────────────────────────────────────────────────
-
-function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is not set");
-  }
-  return new GoogleGenAI({ apiKey });
-}
-
-// ── Core Generate Function ────────────────────────────────────────────────────
+// ── Core Generate Function (Mistral) ──────────────────────────────────────────
 
 export async function generateAnalysis(
   prompt: string,
   systemContext?: string
 ): Promise<string> {
-  const ai = getGeminiClient();
+  if (!MISTRAL_API_KEY) {
+    throw new Error("MISTRAL_API_KEY environment variable is not set");
+  }
 
   const fullPrompt = systemContext
     ? `${SYSTEM_PROMPT}\n\nAdditional context:\n${systemContext}\n\nUser request:\n${prompt}`
     : `${SYSTEM_PROMPT}\n\nUser request:\n${prompt}`;
 
-  // Using gemini-2.5-flash as verified by your curl
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+  const response = await fetch(MISTRAL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${MISTRAL_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "mistral-tiny",
+      messages: [
+        {
+          role: "system",
+          content: "You are a professional crypto market analyst. Follow the requested format exactly."
+        },
+        {
+          role: "user",
+          content: fullPrompt
+        }
+      ],
+      temperature: 0.2
+    })
   });
 
-  const text = response.text;
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(`Mistral API error: ${err.message || response.statusText}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices[0]?.message?.content;
 
   if (!text) {
-    throw new Error("Gemini returned empty response");
+    throw new Error("Mistral returned empty response");
   }
 
   return text.trim();
@@ -80,11 +96,6 @@ Current price: USD ${snapshot.currentPrice.toFixed(2)}
 24-hour change: ${snapshot.change24h >= 0 ? "+" : ""}${snapshot.change24h.toFixed(2)}%
 Recent price history (oldest to newest): ${snapshot.priceHistory.map((p) => "USD " + p.toFixed(2)).join(", ")}
 
-Based on this data, provide:
-1. Your market analysis report (follow the system format)
-2. Signal: respond with exactly one word on its own line: BUY, HOLD, or SELL
-3. Confidence: respond with a number from 0 to 100 on its own line
-
 Format your response exactly like this:
 REPORT:
 [your analysis here]
@@ -94,16 +105,16 @@ CONFIDENCE: 75
 
   const raw = await generateAnalysis(prompt);
 
-  // parse structured response
-  const reportMatch = raw.match(/REPORT:\s*([\s\S]*?)(?=SIGNAL:|$)/);
-  const signalMatch = raw.match(/SIGNAL:\s*(BUY|HOLD|SELL)/);
-  const confidenceMatch = raw.match(/CONFIDENCE:\s*(\d+)/);
+  // Parse structured response - Updated regex to handle markdown/bolding from Mistral
+  const reportMatch = raw.match(/REPORT:\s*([\s\S]*?)(?=\**SIGNAL:|$)/i);
+  const signalMatch = raw.match(/SIGNAL:\s*\**\s*(BUY|HOLD|SELL)/i);
+  const confidenceMatch = raw.match(/CONFIDENCE:\s*\**\s*(\d+)/i);
 
   const report = reportMatch
-    ? reportMatch[1].trim()
+    ? reportMatch[1].replace(/\*\*/g, '').trim() // Strip bolding from report
     : raw.trim();
 
-  const signalRaw = signalMatch ? signalMatch[1].trim() : "HOLD";
+  const signalRaw = signalMatch ? signalMatch[1].toUpperCase().trim() : "HOLD";
   const signal = (["BUY", "HOLD", "SELL"].includes(signalRaw)
     ? signalRaw
     : "HOLD") as "BUY" | "HOLD" | "SELL";
@@ -114,7 +125,7 @@ CONFIDENCE: 75
   const confidence = Math.min(100, Math.max(0, confidenceRaw));
 
   console.log(
-    `[chat] ${snapshot.token} analysis done — signal: ${signal} confidence: ${confidence}%`
+    `[chat] ${snapshot.token} analysis done via Mistral — signal: ${signal} confidence: ${confidence}%`
   );
 
   return { report, signal, confidence };
@@ -132,24 +143,16 @@ export async function chatHandler(
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({
         error: "messages array is required",
-        example: {
-          messages: [{ role: "user", content: "What is the outlook for ETH?" }],
-        },
       });
       return;
     }
 
-    // build prompt from message history
     const conversationPrompt = messages
       .map((m: { role: string; content: string }) => {
         const roleLabel = m.role === "assistant" ? "Assistant" : "User";
         return `${roleLabel}: ${m.content}`;
       })
       .join("\n");
-
-    console.log(
-      `[chat] processing ${messages.length} message(s) from request`
-    );
 
     const responseText = await generateAnalysis(
       conversationPrompt,
@@ -163,23 +166,6 @@ export async function chatHandler(
     res.json(response);
   } catch (err: any) {
     console.error("[chat] error:", err.message);
-
-    if (err.message?.includes("GEMINI_API_KEY")) {
-      res.status(503).json({
-        error: "chat skill not configured",
-        note: "GEMINI_API_KEY environment variable is not set",
-      });
-      return;
-    }
-
-    if (err.message?.includes("quota") || err.message?.includes("429")) {
-      res.status(429).json({
-        error: "Gemini API rate limit reached",
-        note: "Please wait a moment and try again",
-      });
-      return;
-    }
-
     res.status(500).json({
       error: "failed to generate response",
       details: err.message,
