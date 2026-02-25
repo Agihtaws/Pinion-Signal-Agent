@@ -11,22 +11,22 @@ import cors from "cors";
 import { paymentMiddleware } from "x402-express";
 
 // free skill handlers
-import { priceHandler } from "../skills/price.js";
-import { balanceHandler } from "../skills/balance.js";
-import { chatHandler } from "../skills/chat.js";
-import { txHandler } from "../skills/tx.js";
-import { walletHandler } from "../skills/wallet.js";
-import { sendHandler } from "../skills/send.js";
-import { broadcastHandler } from "../skills/broadcast.js";
-import { tradeHandler } from "../skills/trade.js";
-import { fundHandler } from "../skills/fund.js";
+import { priceHandler } from "../skills/price";
+import { balanceHandler } from "../skills/balance";
+import { chatHandler } from "../skills/chat";
+import { txHandler } from "../skills/tx";
+import { walletHandler } from "../skills/wallet";
+import { sendHandler } from "../skills/send";
+import { broadcastHandler } from "../skills/broadcast";
+import { tradeHandler } from "../skills/trade";
+import { fundHandler } from "../skills/fund";
 
 // paid skill handlers
-import { signalHandler } from "./skills/signal.js";
-import { reportHandler } from "./skills/report.js";
-import { watchlistHandler } from "./skills/watchlist.js";
+import { signalHandler } from "./skills/signal";
+import { reportHandler } from "./skills/report";
+import { watchlistHandler } from "./skills/watchlist";
 
-import { storageHealthCheck, readEarnings } from "../agent/storage.js";
+import { storageHealthCheck, readEarnings } from "../agent/storage";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
