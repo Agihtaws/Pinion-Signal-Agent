@@ -26,7 +26,14 @@ import { signalHandler } from "./skills/signal";
 import { reportHandler } from "./skills/report";
 import { watchlistHandler } from "./skills/watchlist";
 
-import { storageHealthCheck, readEarnings } from "../agent/storage";
+// storage imports
+import { 
+  storageHealthCheck, 
+  readEarnings, 
+  readPriceHistory, 
+  readAgentRuns, 
+  readSignalHistory 
+} from "../agent/storage";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -51,7 +58,6 @@ app.use(cors());
 app.use(express.json());
 
 // ── Free Health Endpoint ──────────────────────────────────────────────────────
-// Responds to both /health and /api/health (what the frontend expects)
 app.get(["/health", "/api/health"], (req, res) => {
   const health = storageHealthCheck();
   res.json({
@@ -89,29 +95,22 @@ app.get("/catalog", (req, res) => {
       { endpoint: "/api/broadcast",       method: "POST", price: "free",  description: "Sign and broadcast a transaction" },
       { endpoint: "/api/trade",           method: "POST", price: "free",  description: "Construct unsigned swap transaction" },
       { endpoint: "/api/fund/:address",   method: "GET",  price: "free",  description: "Get wallet balance and funding instructions" },
-      { endpoint: "/api/signal/:token",   method: "GET",  price: "$0.05", description: "AI-powered market signal (BUY/HOLD/SELL)" },
-      { endpoint: "/api/report/:token",   method: "GET",  price: "$0.10", description: "Full AI analysis report for a token" },
-      { endpoint: "/api/signals",         method: "GET",  price: "$0.03", description: "Signals for all tracked tokens in one call" },
+      { endpoint: "/api/signal/:token",   method: "GET",  price: "0.05 dollars", description: "AI-powered market signal (BUY/HOLD/SELL)" },
+      { endpoint: "/api/report/:token",   method: "GET",  price: "0.10 dollars", description: "Full AI analysis report for a token" },
+      { endpoint: "/api/signals",         method: "GET",  price: "0.03 dollars", description: "Signals for all tracked tokens in one call" },
     ],
     timestamp: new Date().toISOString(),
   });
 });
 
 // ── Free Dashboard Data Endpoints ─────────────────────────────────────────────
-// These provide the data needed by the frontend dashboard
+// These provide numeric data needed by the fixed frontend components
 
 app.get("/api/prices", (req, res) => {
   try {
-    const { readPriceHistory } = require("../agent/storage"); // .js removed
     const history = readPriceHistory();
-    
-    // Ensure change values are strings (frontend expects strings)
-    const safeHistory = history.map((h: any) => ({
-      ...h,
-      change24h: String(h.change24h || "0")
-    }));
-    
-    res.json(safeHistory);
+    // Return numeric data as-is for frontend formatting
+    res.json(history);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -127,7 +126,6 @@ app.get("/api/earnings", (req, res) => {
 
 app.get("/api/runs", (req, res) => {
   try {
-    const { readAgentRuns } = require("../agent/storage"); // .js removed
     res.json(readAgentRuns());
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -137,13 +135,6 @@ app.get("/api/runs", (req, res) => {
 // ── Test Data Endpoint (legacy, kept for debugging) ──────────────────────────
 app.get("/test/data", (req, res) => {
   try {
-    const {
-      readPriceHistory,
-      readSignalHistory,
-      readEarnings,
-      readAgentRuns,
-    } = require("../agent/storage"); // .js removed
-
     res.json({
       prices: readPriceHistory(),
       signals: readSignalHistory(),
@@ -157,10 +148,6 @@ app.get("/test/data", (req, res) => {
 
 // ── x402 Paid Endpoints (with /api prefix) ────────────────────────────────────
 // These routes require payment via x402
-
-const BASE_URL = process.env.RENDER_EXTERNAL_URL
-  || process.env.NEXT_PUBLIC_BACKEND_URL
-  || `http://localhost:${PORT}`;
 
 const paidRoutes = {
   "/api/signal/:token": {
@@ -188,7 +175,7 @@ app.use(
 // Paid route handlers (after middleware)
 app.get("/api/signal/:token", signalHandler);
 app.get("/api/report/:token", reportHandler);
-app.get("/api/signals", watchlistHandler); // This matches the frontend's fetch call
+app.get("/api/signals", watchlistHandler); 
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
@@ -201,7 +188,7 @@ app.listen(PORT, () => {
   console.log(`[server] network:  ${NETWORK}`);
   console.log(`[server] pay to:   ${PAY_TO}`);
   console.log(`[server] free skills: price, balance, chat, tx, wallet, send, broadcast, trade, fund`);
-  console.log(`[server] paid skills: signal ($0.05), report ($0.10), signals ($0.03)`);
+  console.log(`[server] paid skills: signal (0.05 dollars), report (0.10 dollars), signals (0.03 dollars)`);
   console.log("──────────────────────────────────────────\n");
 
   const health = storageHealthCheck();
