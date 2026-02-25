@@ -4,14 +4,12 @@
   "description": "Autonomous crypto signal agent built on PinionOS",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node server/index.ts",
-    "dev:signal": "nodemon --exec ts-node server/signal-server.ts",
-    "dev:agent": "nodemon --exec ts-node agent/index.ts",
-    "dev:all": "ts-node main.ts",
-    "build": "tsc",
-    "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit"
-  },
+  "dev": "ts-node server/index.ts",
+  "dev:agent": "ts-node agent/index.ts",
+  "dev:all": "ts-node main.ts",
+  "build": "tsc",
+  "start": "node dist/main.js"
+},
   "dependencies": {
     "@google/genai": "^1.0.1",
     "dotenv": "^17.3.1",
