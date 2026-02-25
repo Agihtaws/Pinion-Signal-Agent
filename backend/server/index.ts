@@ -51,8 +51,8 @@ app.use(cors());
 app.use(express.json());
 
 // ── Free Health Endpoint ──────────────────────────────────────────────────────
-
-app.get("/health", (req, res) => {
+// Responds to both /health and /api/health (what the frontend expects)
+app.get(["/health", "/api/health"], (req, res) => {
   const health = storageHealthCheck();
   res.json({
     status: "ok",
@@ -63,44 +63,57 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ── Free Skill Endpoints ──────────────────────────────────────────────────────
+// ── Free Skill Endpoints (with /api prefix for frontend compatibility) ───────
+app.get("/api/price/:token", priceHandler);
+app.get("/api/balance/:address", balanceHandler);
+app.post("/api/chat", chatHandler);
+app.get("/api/tx/:hash", txHandler);
+app.get("/api/wallet/generate", walletHandler);
+app.post("/api/send", sendHandler);
+app.post("/api/broadcast", broadcastHandler);
+app.post("/api/trade", tradeHandler);
+app.get("/api/fund/:address", fundHandler);
 
-app.get("/price/:token", priceHandler);
-app.get("/balance/:address", balanceHandler);
-app.post("/chat", chatHandler);
-app.get("/tx/:hash", txHandler);
-app.get("/wallet/generate", walletHandler);
-app.post("/send", sendHandler);
-app.post("/broadcast", broadcastHandler);
-app.post("/trade", tradeHandler);
-app.get("/fund/:address", fundHandler);
-
-// ── Catalog ───────────────────────────────────────────────────────────────────
-
+// ── Catalog (remains free, lists all available endpoints) ────────────────────
 app.get("/catalog", (req, res) => {
   res.json({
     server: "pinion-signal-agent",
     network: NETWORK,
     skills: [
-      { endpoint: "/price/:token",    method: "GET",  price: "free",  description: "Get USD price for ETH, WETH, CBETH, USDC, DAI, USDT" },
-      { endpoint: "/balance/:address",method: "GET",  price: "free",  description: "Get ETH and USDC balances for any address" },
-      { endpoint: "/chat",            method: "POST", price: "free",  description: "Chat with Gemini AI analyst" },
-      { endpoint: "/tx/:hash",        method: "GET",  price: "free",  description: "Get decoded transaction details" },
-      { endpoint: "/wallet/generate", method: "GET",  price: "free",  description: "Generate a fresh wallet keypair" },
-      { endpoint: "/send",            method: "POST", price: "free",  description: "Construct unsigned ETH or USDC transfer tx" },
-      { endpoint: "/broadcast",       method: "POST", price: "free",  description: "Sign and broadcast a transaction" },
-      { endpoint: "/trade",           method: "POST", price: "free",  description: "Construct unsigned swap transaction" },
-      { endpoint: "/fund/:address",   method: "GET",  price: "free",  description: "Get wallet balance and funding instructions" },
-      { endpoint: "/signal/:token",   method: "GET",  price: "$0.05", description: "AI-powered market signal (BUY/HOLD/SELL)" },
-      { endpoint: "/report/:token",   method: "GET",  price: "$0.10", description: "Full AI analysis report for a token" },
-      { endpoint: "/watchlist",       method: "GET",  price: "$0.03", description: "Signals for all tracked tokens in one call" },
+      { endpoint: "/api/price/:token",    method: "GET",  price: "free",  description: "Get USD price for ETH, WETH, CBETH, USDC, DAI, USDT" },
+      { endpoint: "/api/balance/:address",method: "GET",  price: "free",  description: "Get ETH and USDC balances for any address" },
+      { endpoint: "/api/chat",            method: "POST", price: "free",  description: "Chat with Gemini AI analyst" },
+      { endpoint: "/api/tx/:hash",        method: "GET",  price: "free",  description: "Get decoded transaction details" },
+      { endpoint: "/api/wallet/generate", method: "GET",  price: "free",  description: "Generate a fresh wallet keypair" },
+      { endpoint: "/api/send",            method: "POST", price: "free",  description: "Construct unsigned ETH or USDC transfer tx" },
+      { endpoint: "/api/broadcast",       method: "POST", price: "free",  description: "Sign and broadcast a transaction" },
+      { endpoint: "/api/trade",           method: "POST", price: "free",  description: "Construct unsigned swap transaction" },
+      { endpoint: "/api/fund/:address",   method: "GET",  price: "free",  description: "Get wallet balance and funding instructions" },
+      { endpoint: "/api/signal/:token",   method: "GET",  price: "$0.05", description: "AI-powered market signal (BUY/HOLD/SELL)" },
+      { endpoint: "/api/report/:token",   method: "GET",  price: "$0.10", description: "Full AI analysis report for a token" },
+      { endpoint: "/api/signals",         method: "GET",  price: "$0.03", description: "Signals for all tracked tokens in one call" },
     ],
     timestamp: new Date().toISOString(),
   });
 });
 
-// ── Test Data Endpoint (for frontend dashboard) ───────────────────────────────
+// ── Free Dashboard Data Endpoints ─────────────────────────────────────────────
+// These provide the data needed by the frontend dashboard
+app.get("/api/prices", (req, res) => {
+  const { readPriceHistory } = require("../agent/storage"); // .js removed
+  res.json(readPriceHistory());
+});
 
+app.get("/api/earnings", (req, res) => {
+  res.json(readEarnings());
+});
+
+app.get("/api/runs", (req, res) => {
+  const { readAgentRuns } = require("../agent/storage"); // .js removed
+  res.json(readAgentRuns());
+});
+
+// ── Test Data Endpoint (legacy, kept for debugging) ──────────────────────────
 app.get("/test/data", (req, res) => {
   try {
     const {
@@ -108,7 +121,7 @@ app.get("/test/data", (req, res) => {
       readSignalHistory,
       readEarnings,
       readAgentRuns,
-    } = require("../agent/storage");
+    } = require("../agent/storage"); // .js removed
 
     res.json({
       prices: readPriceHistory(),
@@ -121,29 +134,29 @@ app.get("/test/data", (req, res) => {
   }
 });
 
-// ── x402 Paid Endpoints ───────────────────────────────────────────────────────
-// apply payment middleware only to these three routes
+// ── x402 Paid Endpoints (with /api prefix) ────────────────────────────────────
+// These routes require payment via x402
 
 const BASE_URL = process.env.RENDER_EXTERNAL_URL
   || process.env.NEXT_PUBLIC_BACKEND_URL
   || `http://localhost:${PORT}`;
 
 const paidRoutes = {
-  [`/signal/:token`]: {
+  "/api/signal/:token": {
     price: { amount: "50000", asset: USDC_ADDRESS },
     description: "AI-powered market signal (BUY/HOLD/SELL) with confidence score",
   },
-  [`/report/:token`]: {
+  "/api/report/:token": {
     price: { amount: "100000", asset: USDC_ADDRESS },
     description: "Full AI-generated market analysis report for a token",
   },
-  "/watchlist": {
+  "/api/signals": {
     price: { amount: "30000", asset: USDC_ADDRESS },
     description: "Signals for all tracked tokens in one call",
   },
 };
 
-// x402 middleware for paid routes
+// Apply payment middleware only to the paid routes
 app.use(
   paymentMiddleware(PAY_TO, paidRoutes, {
     url: FACILITATOR,
@@ -151,10 +164,10 @@ app.use(
   })
 );
 
-// paid route handlers (after middleware)
-app.get("/signal/:token", signalHandler);
-app.get("/report/:token", reportHandler);
-app.get("/watchlist", watchlistHandler);
+// Paid route handlers (after middleware)
+app.get("/api/signal/:token", signalHandler);
+app.get("/api/report/:token", reportHandler);
+app.get("/api/signals", watchlistHandler); // This matches the frontend's fetch call
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
@@ -167,7 +180,7 @@ app.listen(PORT, () => {
   console.log(`[server] network:  ${NETWORK}`);
   console.log(`[server] pay to:   ${PAY_TO}`);
   console.log(`[server] free skills: price, balance, chat, tx, wallet, send, broadcast, trade, fund`);
-  console.log(`[server] paid skills: signal ($0.05), report ($0.10), watchlist ($0.03)`);
+  console.log(`[server] paid skills: signal ($0.05), report ($0.10), signals ($0.03)`);
   console.log("──────────────────────────────────────────\n");
 
   const health = storageHealthCheck();
