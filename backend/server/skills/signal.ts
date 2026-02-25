@@ -1,6 +1,6 @@
 // server/skills/signal.ts
 // paid endpoint — returns latest signal for a token
-// price: $0.05 USDC per call via x402
+// price: 0.05 dollars USDC per call via x402
 
 import type { Request, Response } from "express";
 import {
@@ -39,21 +39,22 @@ export async function signalHandler(
       return;
     }
 
+    // Reverted to numbers to match Engineering best practices and updated shared types
     const response: SignalEndpointResponse & {
-  currentPrice: number;
-  currentChange24h: string | null;
-} = {
-  token: signal.token,
-  signal: signal.signal,
-  confidence: signal.confidence,
-  priceAtSignal: signal.priceAtSignal,
-  change1h: String(signal.change1h ?? "0"),   // ← convert to string
-  change6h: String(signal.change6h ?? "0"),   // ← convert to string
-  change24h: String(signal.change24h ?? "0"), // ← convert to string
-  currentPrice: latestPrice?.priceUSD || signal.priceAtSignal,
-  currentChange24h: latestPrice?.change24h || null,
-  generatedAt: signal.timestamp,
-};
+      currentPrice: number;
+      currentChange24h: number | null;
+    } = {
+      token: signal.token,
+      signal: signal.signal,
+      confidence: signal.confidence,
+      priceAtSignal: signal.priceAtSignal,
+      change1h: signal.change1h ?? 0,
+      change6h: signal.change6h ?? 0,
+      change24h: signal.change24h ?? 0,
+      currentPrice: latestPrice?.priceUSD || signal.priceAtSignal,
+      currentChange24h: latestPrice?.change24h ?? null,
+      generatedAt: signal.timestamp,
+    };
 
     // log earning — payment already verified by x402 middleware
     logEarning(req, `/signal/${token}`, 0.05);
