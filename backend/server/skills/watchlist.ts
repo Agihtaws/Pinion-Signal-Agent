@@ -1,6 +1,6 @@
 // server/skills/watchlist.ts
 // paid endpoint — returns signals for all tracked tokens at once
-// price: $0.03 USDC per call via x402
+// price: 0.03 dollars USDC per call via x402
 
 import type { Request, Response } from "express";
 import {
@@ -25,19 +25,7 @@ export async function watchlistHandler(
       return;
     }
 
-    const response: WatchlistEndpointResponse & {
-      signals: Array<{
-        token: string;
-        signal: any;
-        confidence: number;
-        priceAtSignal: number;
-        change1h: string;   // changed from number to string
-        change6h: string;   // changed from number to string
-        change24h: string;  // changed from number to string
-        currentPrice: number;
-        generatedAt: string;
-      }>;
-    } = {
+    const response: WatchlistEndpointResponse = {
       signals: signals.map((s) => {
         const latestPrice = getLatestPrice(s.token);
         return {
@@ -45,10 +33,10 @@ export async function watchlistHandler(
           signal: s.signal,
           confidence: s.confidence,
           priceAtSignal: s.priceAtSignal,
-          // Convert numbers to strings to satisfy frontend .startsWith()
-          change1h: String(s.change1h || "0"),
-          change6h: String(s.change6h || "0"),
-          change24h: String(s.change24h || "0"),
+          // Reverted to numbers to match updated shared types and frontend numeric logic
+          change1h: s.change1h ?? 0,
+          change6h: s.change6h ?? 0,
+          change24h: s.change24h ?? 0,
           currentPrice: latestPrice?.priceUSD || s.priceAtSignal,
           generatedAt: s.timestamp,
         };
