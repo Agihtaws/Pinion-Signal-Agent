@@ -107,12 +107,14 @@ app.get("/test/data", (req, res) => {
       readPriceHistory,
       readSignalHistory,
       readEarnings,
+      readAgentRuns,
     } = require("../agent/storage.js");
 
     res.json({
       prices: readPriceHistory(),
       signals: readSignalHistory(),
       earnings: readEarnings(),
+      runs: readAgentRuns(),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
