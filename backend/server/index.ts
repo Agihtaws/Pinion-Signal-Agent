@@ -99,18 +99,39 @@ app.get("/catalog", (req, res) => {
 
 // ── Free Dashboard Data Endpoints ─────────────────────────────────────────────
 // These provide the data needed by the frontend dashboard
+
 app.get("/api/prices", (req, res) => {
-  const { readPriceHistory } = require("../agent/storage"); // .js removed
-  res.json(readPriceHistory());
+  try {
+    const { readPriceHistory } = require("../agent/storage"); // .js removed
+    const history = readPriceHistory();
+    
+    // Ensure change values are strings (frontend expects strings)
+    const safeHistory = history.map((h: any) => ({
+      ...h,
+      change24h: String(h.change24h || "0")
+    }));
+    
+    res.json(safeHistory);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/earnings", (req, res) => {
-  res.json(readEarnings());
+  try {
+    res.json(readEarnings());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/runs", (req, res) => {
-  const { readAgentRuns } = require("../agent/storage"); // .js removed
-  res.json(readAgentRuns());
+  try {
+    const { readAgentRuns } = require("../agent/storage"); // .js removed
+    res.json(readAgentRuns());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Test Data Endpoint (legacy, kept for debugging) ──────────────────────────
