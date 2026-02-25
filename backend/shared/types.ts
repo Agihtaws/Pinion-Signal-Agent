@@ -6,7 +6,7 @@
 export interface PriceEntry {
   token: string;          // ETH, WETH, CBETH
   priceUSD: number;       // current USD price
-  change24h: string | null; // e.g. "+1.23%" or null
+  change24h: number | null; // Fixed double semicolon
   source: string;         // coingecko, birdeye etc
   timestamp: string;      // ISO string
 }
@@ -21,16 +21,16 @@ export interface PriceHistory {
 export type SignalType = "BUY" | "HOLD" | "SELL";
 
 export interface Signal {
-  id: string;             // uuid v4
-  token: string;          // ETH, WETH, CBETH
-  signal: SignalType;     // BUY, HOLD, SELL
-  confidence: number;     // 0 to 100
-  priceAtSignal: number;  // USD price when signal was generated
-  change1h: string;       // % price change over last 1 hour (as string)
-  change6h: string;       // % price change over last 6 hours (as string)
-  change24h: string;      // % price change over last 24 hours (as string)
-  aiReport: string;       // Gemini generated analysis paragraph
-  timestamp: string;      // ISO string
+  id: string;
+  token: string;
+  signal: SignalType;
+  confidence: number;
+  priceAtSignal: number;
+  change1h: number; 
+  change6h: number;
+  change24h: number;
+  aiReport: string;
+  timestamp: string;
 }
 
 export interface SignalHistory {
@@ -85,7 +85,7 @@ export interface PriceSkillData {
   token: string;
   network: string;
   priceUSD: number;
-  change24h: string | null;
+  change24h: number | null; // Changed from string to number for consistency
   source: string;
   timestamp: string;
 }
@@ -200,11 +200,12 @@ export interface SignalEndpointResponse {
   signal: SignalType;
   confidence: number;
   priceAtSignal: number;
-  change1h: string;    // now string (was number)
-  change6h: string;    // now string (was number)
-  change24h: string;   // now string (was number)
+  change1h: number;
+  change6h: number;
+  change24h: number;
   generatedAt: string;
 }
+
 
 // what /report/:token returns to callers
 export interface ReportEndpointResponse {
@@ -218,7 +219,7 @@ export interface ReportEndpointResponse {
 
 // what /watchlist returns to callers
 export interface WatchlistEndpointResponse {
-  signals: SignalEndpointResponse[];
+  signals: (SignalEndpointResponse & { currentPrice: number })[];
   generatedAt: string;
 }
 
