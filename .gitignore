@@ -1,0 +1,25 @@
+backend/.env
+frontend/.env.local
+*.env
+
+# dependencies
+backend/node_modules/
+frontend/node_modules/
+
+# build outputs
+backend/dist/
+frontend/.next/
+frontend/out/
+
+# data files — runtime only, not source code
+backend/data/prices.json
+backend/data/signals.json
+backend/data/earnings.json
+backend/data/runs.json
+
+# os files
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

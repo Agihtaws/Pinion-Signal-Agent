@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #080b0f;
+  --surface: #0d1117;
+  --border: #1a2332;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: #080b0f;
+  color: #e8edf2;
+}
+
+/* custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a2332;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #243044;
+}
+
+/* selection */
+::selection {
+  background: #00d4a030;
+  color: #00ffbf;
+}
+
+/* utility classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .font-mono-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .glass {
+    background: rgba(13, 17, 23, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .card-glow-green {
+    box-shadow: 0 0 0 1px #00d4a020, 0 4px 24px #00d4a010;
+  }
+  .card-glow-amber {
+    box-shadow: 0 0 0 1px #f5a62320, 0 4px 24px #f5a62310;
+  }
+  .card-glow-red {
+    box-shadow: 0 0 0 1px #ff4d6d20, 0 4px 24px #ff4d6d10;
+  }
+}
