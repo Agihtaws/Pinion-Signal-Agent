@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4020";
 
 export async function GET() {
   try {
-    // read runs.json directly from backend data folder
-    const runsPath = path.join(process.cwd(), "..", "data", "runs.json");
-    if (!fs.existsSync(runsPath)) {
-      return NextResponse.json([]);
-    }
-    const raw = fs.readFileSync(runsPath, "utf-8");
-    const runs = JSON.parse(raw);
-    return NextResponse.json(runs.slice(0, 20));
+    const res = await fetch(`${BACKEND}/test/data`, {
+      next: { revalidate: 30 },
+    });
+    const data = await res.json();
+    // extract runs from test/data or return empty
+    return NextResponse.json(data.runs || []);
   } catch {
     return NextResponse.json([]);
   }
