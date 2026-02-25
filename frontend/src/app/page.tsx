@@ -12,15 +12,14 @@ import { LiveTicker } from "@/components/LiveTicker";
 const AGENT_WALLET = process.env.NEXT_PUBLIC_AGENT_WALLET || "";
 const TOKENS = ["ETH", "WETH", "CBETH"];
 
-// Fixed the Signal interface: the SignalCard component expects change fields to be strings
 interface Signal {
   token: string;
   signal: "BUY" | "HOLD" | "SELL";
   confidence: number;
   priceAtSignal: number;
-  change1h: string;
-  change6h: string;
-  change24h: string;
+  change1h: number; // Changed to number to match API
+  change6h: number;
+  change24h: number;
   aiReport: string;
   timestamp: string;
 }
@@ -60,6 +59,12 @@ export default function Dashboard() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [mounted, setMounted] = useState(false);
+
+  // Fixes hydration mismatch by waiting for client-side mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -102,16 +107,13 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* grid background */}
       <div className="fixed inset-0 bg-grid-pattern bg-grid opacity-20 pointer-events-none" />
 
       <Header />
 
-      {/* live ticker below header */}
       <LiveTicker prices={prices} signals={signals} />
 
       <main className="relative z-10 max-w-screen-xl mx-auto px-4 py-6">
-        {/* page title */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="font-display text-xl font-bold text-text-primary">
@@ -124,12 +126,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
             <span className="font-mono text-2xs text-text-muted">
-              Refreshed {lastRefresh.toLocaleTimeString()}
+              Refreshed {mounted ? lastRefresh.toLocaleTimeString() : "--:--:--"}
             </span>
           </div>
         </div>
 
-        {/* API endpoints banner */}
         <div className="mb-6 p-3 rounded-lg border border-blue/20 bg-blue/5">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-1 rounded-full bg-blue" />
@@ -155,7 +156,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* signal cards row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {TOKENS.map((token) => (
             <SignalCard
@@ -167,15 +167,12 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* main content grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* left col — chart + feed */}
           <div className="lg:col-span-2 space-y-4">
             <PriceChart prices={prices} loading={loading} />
             <AgentFeed runs={runs} signals={signals} loading={loading} />
           </div>
 
-          {/* right col */}
           <div className="space-y-4">
             <EarningsWidget earnings={earnings} loading={loading} />
             <WalletHealth
@@ -187,7 +184,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* footer */}
         <footer className="mt-8 pt-4 border-t border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="font-mono text-2xs text-text-muted">
