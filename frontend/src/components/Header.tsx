@@ -74,8 +74,8 @@ export function Header() {
         </div>
 
         {/* center — clock */}
-        <div className="hidden md:block font-mono text-2xs text-text-muted">
-          {time}
+        <div suppressHydrationWarning className="hidden md:block font-mono text-2xs text-text-muted">
+         {time}
         </div>
 
         {/* right — wallet */}
