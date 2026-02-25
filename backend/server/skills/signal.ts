@@ -40,20 +40,20 @@ export async function signalHandler(
     }
 
     const response: SignalEndpointResponse & {
-      currentPrice: number;
-      currentChange24h: string | null;
-    } = {
-      token: signal.token,
-      signal: signal.signal,
-      confidence: signal.confidence,
-      priceAtSignal: signal.priceAtSignal,
-      change1h: signal.change1h,
-      change6h: signal.change6h,
-      change24h: signal.change24h,
-      currentPrice: latestPrice?.priceUSD || signal.priceAtSignal,
-      currentChange24h: latestPrice?.change24h || null,
-      generatedAt: signal.timestamp,
-    };
+  currentPrice: number;
+  currentChange24h: string | null;
+} = {
+  token: signal.token,
+  signal: signal.signal,
+  confidence: signal.confidence,
+  priceAtSignal: signal.priceAtSignal,
+  change1h: String(signal.change1h ?? "0"),   // ← convert to string
+  change6h: String(signal.change6h ?? "0"),   // ← convert to string
+  change24h: String(signal.change24h ?? "0"), // ← convert to string
+  currentPrice: latestPrice?.priceUSD || signal.priceAtSignal,
+  currentChange24h: latestPrice?.change24h || null,
+  generatedAt: signal.timestamp,
+};
 
     // log earning — payment already verified by x402 middleware
     logEarning(req, `/signal/${token}`, 0.05);
