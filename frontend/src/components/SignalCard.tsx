@@ -7,9 +7,9 @@ interface Signal {
   signal: "BUY" | "HOLD" | "SELL";
   confidence: number;
   priceAtSignal: number;
-  change1h: number;
-  change6h: number;
-  change24h: number;
+  change1h: string;   // changed to string
+  change6h: string;   // changed to string
+  change24h: string;  // changed to string
   aiReport: string;
   timestamp: string;
 }
@@ -47,18 +47,12 @@ const SIGNAL_CONFIG = {
   },
 };
 
-function ChangeChip({ value }: { value: number }) {
-  const isPos = value >= 0;
+function ChangeChip({ value }: { value: string }) {
+  const num = parseFloat(value);
+  const isPos = num >= 0;
   return (
-    <span
-      className={cn(
-        "font-mono text-2xs px-1.5 py-0.5 rounded",
-        isPos
-          ? "text-green bg-green/10"
-          : "text-red bg-red/10"
-      )}
-    >
-      {isPos ? "+" : ""}{value.toFixed(2)}%
+    <span className={cn("font-mono text-2xs px-1.5 py-0.5 rounded", isPos ? "text-green bg-green/10" : "text-red bg-red/10")}>
+      {isPos ? "+" : ""}{num.toFixed(2)}%
     </span>
   );
 }
