@@ -1,46 +1,69 @@
 // server/index.ts
-import express from "express";
+// single combined server for Render deployment
+// free skills + x402 paid endpoints on one port
+// Render sets PORT automatically via environment variable
+
 import dotenv from "dotenv";
 dotenv.config();
 
-import {
-  storageHealthCheck,
-  writePriceEntry,
-  readPriceHistory,
-  writeSignal,
-  readSignalHistory,
-  writeEarningEntry,
-  readEarnings,
-} from "../agent/storage";
-import { priceHandler } from "../skills/price";
-import { balanceHandler } from "../skills/balance";
-import { chatHandler } from "../skills/chat";
-import { txHandler } from "../skills/tx";
-import { walletHandler } from "../skills/wallet";
-import { sendHandler } from "../skills/send";
-import { broadcastHandler } from "../skills/broadcast";
-import { tradeHandler } from "../skills/trade";
-import { fundHandler } from "../skills/fund";
+import express from "express";
+import cors from "cors";
+import { paymentMiddleware } from "x402-express";
+
+// free skill handlers
+import { priceHandler } from "../skills/price.js";
+import { balanceHandler } from "../skills/balance.js";
+import { chatHandler } from "../skills/chat.js";
+import { txHandler } from "../skills/tx.js";
+import { walletHandler } from "../skills/wallet.js";
+import { sendHandler } from "../skills/send.js";
+import { broadcastHandler } from "../skills/broadcast.js";
+import { tradeHandler } from "../skills/trade.js";
+import { fundHandler } from "../skills/fund.js";
+
+// paid skill handlers
+import { signalHandler } from "./skills/signal.js";
+import { reportHandler } from "./skills/report.js";
+import { watchlistHandler } from "./skills/watchlist.js";
+
+import { storageHealthCheck, readEarnings } from "../agent/storage.js";
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const PORT = parseInt(process.env.PORT || process.env.SKILL_SERVER_PORT || "4020", 10);
+const NETWORK = process.env.PINION_NETWORK || "base-sepolia";
+const PAY_TO = process.env.SKILL_SERVER_PAY_TO || "";
+const FACILITATOR = "https://facilitator.payai.network";
+
+// USDC on Base Sepolia
+const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+if (!PAY_TO) {
+  console.error("[server] ERROR: SKILL_SERVER_PAY_TO not set in .env");
+  process.exit(1);
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.SKILL_SERVER_PORT || 4020;
+// ── Free Health Endpoint ──────────────────────────────────────────────────────
 
-// ── Health ────────────────────────────────────────────────────────────────────
-
-app.get("/health", (_req, res) => {
-  const storage = storageHealthCheck();
+app.get("/health", (req, res) => {
+  const health = storageHealthCheck();
   res.json({
     status: "ok",
     server: "pinion-signal-agent",
-    network: process.env.PINION_NETWORK || "base-sepolia",
-    storage,
+    network: NETWORK,
+    storage: health,
     timestamp: new Date().toISOString(),
   });
 });
 
-// ── Skills ────────────────────────────────────────────────────────────────────
+// ── Free Skill Endpoints ──────────────────────────────────────────────────────
 
 app.get("/price/:token", priceHandler);
 app.get("/balance/:address", balanceHandler);
@@ -52,84 +75,101 @@ app.post("/broadcast", broadcastHandler);
 app.post("/trade", tradeHandler);
 app.get("/fund/:address", fundHandler);
 
-// ── Catalog (free discovery endpoint) ────────────────────────────────────────
+// ── Catalog ───────────────────────────────────────────────────────────────────
 
-app.get("/catalog", (_req, res) => {
+app.get("/catalog", (req, res) => {
   res.json({
     server: "pinion-signal-agent",
-    network: process.env.PINION_NETWORK || "base-sepolia",
+    network: NETWORK,
     skills: [
-      { endpoint: "/price/:token", method: "GET", price: "$0.01", description: "Get USD price for ETH, WETH, CBETH, USDC, DAI, USDT" },
-      { endpoint: "/balance/:address", method: "GET", price: "$0.01", description: "Get ETH and USDC balances for any address" },
-      { endpoint: "/chat", method: "POST", price: "$0.01", description: "Chat with Gemini AI analyst" },
-      { endpoint: "/tx/:hash", method: "GET", price: "$0.01", description: "Get decoded transaction details" },
-      { endpoint: "/wallet/generate", method: "GET", price: "$0.01", description: "Generate a fresh wallet keypair" },
-      { endpoint: "/send", method: "POST", price: "$0.01", description: "Construct unsigned ETH or USDC transfer tx" },
-      { endpoint: "/broadcast", method: "POST", price: "$0.01", description: "Sign and broadcast a transaction" },
-      { endpoint: "/trade", method: "POST", price: "$0.01", description: "Construct unsigned swap transaction" },
-      { endpoint: "/fund/:address", method: "GET", price: "$0.01", description: "Get wallet balance and funding instructions" },
-      { endpoint: "/signal/:token", method: "GET", price: "$0.05", description: "Get AI-powered market signal for a token" },
-      { endpoint: "/report/:token", method: "GET", price: "$0.10", description: "Get full AI analysis report for a token" },
-      { endpoint: "/watchlist", method: "GET", price: "$0.03", description: "Get signals for all tracked tokens" },
+      { endpoint: "/price/:token",    method: "GET",  price: "free",  description: "Get USD price for ETH, WETH, CBETH, USDC, DAI, USDT" },
+      { endpoint: "/balance/:address",method: "GET",  price: "free",  description: "Get ETH and USDC balances for any address" },
+      { endpoint: "/chat",            method: "POST", price: "free",  description: "Chat with Gemini AI analyst" },
+      { endpoint: "/tx/:hash",        method: "GET",  price: "free",  description: "Get decoded transaction details" },
+      { endpoint: "/wallet/generate", method: "GET",  price: "free",  description: "Generate a fresh wallet keypair" },
+      { endpoint: "/send",            method: "POST", price: "free",  description: "Construct unsigned ETH or USDC transfer tx" },
+      { endpoint: "/broadcast",       method: "POST", price: "free",  description: "Sign and broadcast a transaction" },
+      { endpoint: "/trade",           method: "POST", price: "free",  description: "Construct unsigned swap transaction" },
+      { endpoint: "/fund/:address",   method: "GET",  price: "free",  description: "Get wallet balance and funding instructions" },
+      { endpoint: "/signal/:token",   method: "GET",  price: "$0.05", description: "AI-powered market signal (BUY/HOLD/SELL)" },
+      { endpoint: "/report/:token",   method: "GET",  price: "$0.10", description: "Full AI analysis report for a token" },
+      { endpoint: "/watchlist",       method: "GET",  price: "$0.03", description: "Signals for all tracked tokens in one call" },
     ],
     timestamp: new Date().toISOString(),
   });
 });
 
-// ── Storage Test Endpoints (remove after testing) ─────────────────────────────
+// ── Test Data Endpoint (for frontend dashboard) ───────────────────────────────
 
-app.post("/test/price", (req, res) => {
-  writePriceEntry({
-    token: req.body.token || "ETH",
-    priceUSD: req.body.priceUSD || 2650.00,
-    change24h: req.body.change24h || "+1.23%",
-    source: "test",
-    timestamp: new Date().toISOString(),
-  });
-  res.json({ ok: true, history: readPriceHistory() });
+app.get("/test/data", (req, res) => {
+  try {
+    const {
+      readPriceHistory,
+      readSignalHistory,
+      readEarnings,
+    } = require("../agent/storage.js");
+
+    res.json({
+      prices: readPriceHistory(),
+      signals: readSignalHistory(),
+      earnings: readEarnings(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/test/signal", (req, res) => {
-  const { randomUUID } = require("crypto");
-  writeSignal({
-    id: randomUUID(),
-    token: req.body.token || "ETH",
-    signal: req.body.signal || "BUY",
-    confidence: req.body.confidence || 75,
-    priceAtSignal: req.body.priceAtSignal || 2650.00,
-    change1h: req.body.change1h || 0.5,
-    change6h: req.body.change6h || 1.2,
-    change24h: req.body.change24h || 2.1,
-    aiReport: req.body.aiReport || "Test AI report.",
-    timestamp: new Date().toISOString(),
-  });
-  res.json({ ok: true, history: readSignalHistory() });
-});
+// ── x402 Paid Endpoints ───────────────────────────────────────────────────────
+// apply payment middleware only to these three routes
 
-app.post("/test/earning", (req, res) => {
-  writeEarningEntry(
-    req.body.endpoint || "/signal/ETH",
-    req.body.amountUSDC || 0.05,
-    req.body.callerAddress || "0x1234567890abcdef1234567890abcdef12345678"
-  );
-  res.json({ ok: true, earnings: readEarnings() });
-});
+const BASE_URL = process.env.RENDER_EXTERNAL_URL
+  || process.env.NEXT_PUBLIC_BACKEND_URL
+  || `http://localhost:${PORT}`;
 
-app.get("/test/data", (_req, res) => {
-  res.json({
-    prices: readPriceHistory(),
-    signals: readSignalHistory(),
-    earnings: readEarnings(),
-  });
-});
+const paidRoutes = {
+  [`/signal/:token`]: {
+    price: { amount: "50000", asset: USDC_ADDRESS },
+    description: "AI-powered market signal (BUY/HOLD/SELL) with confidence score",
+  },
+  [`/report/:token`]: {
+    price: { amount: "100000", asset: USDC_ADDRESS },
+    description: "Full AI-generated market analysis report for a token",
+  },
+  "/watchlist": {
+    price: { amount: "30000", asset: USDC_ADDRESS },
+    description: "Signals for all tracked tokens in one call",
+  },
+};
+
+// x402 middleware for paid routes
+app.use(
+  paymentMiddleware(PAY_TO, paidRoutes, {
+    url: FACILITATOR,
+    network: NETWORK as any,
+  })
+);
+
+// paid route handlers (after middleware)
+app.get("/signal/:token", signalHandler);
+app.get("/report/:token", reportHandler);
+app.get("/watchlist", watchlistHandler);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`pinion-signal-agent server running on port ${PORT}`);
-  storageHealthCheck();
-  console.log("[storage] all data files verified");
-  console.log(`[server] ${12} skills registered`);
+  console.log("\n");
+  console.log("╔══════════════════════════════════════════╗");
+  console.log("║     PINION SIGNAL AGENT SERVER           ║");
+  console.log("╚══════════════════════════════════════════╝");
+  console.log(`[server] port:     ${PORT}`);
+  console.log(`[server] network:  ${NETWORK}`);
+  console.log(`[server] pay to:   ${PAY_TO}`);
+  console.log(`[server] free skills: price, balance, chat, tx, wallet, send, broadcast, trade, fund`);
+  console.log(`[server] paid skills: signal ($0.05), report ($0.10), watchlist ($0.03)`);
+  console.log("──────────────────────────────────────────\n");
+
+  const health = storageHealthCheck();
+  console.log(`[server] storage health: ${health.ok ? "OK" : "FAIL"}`);
 });
 
-export default app;
+export { app };
