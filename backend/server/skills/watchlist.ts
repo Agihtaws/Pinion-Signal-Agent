@@ -31,9 +31,9 @@ export async function watchlistHandler(
         signal: any;
         confidence: number;
         priceAtSignal: number;
-        change1h: number;
-        change6h: number;
-        change24h: number;
+        change1h: string;   // changed from number to string
+        change6h: string;   // changed from number to string
+        change24h: string;  // changed from number to string
         currentPrice: number;
         generatedAt: string;
       }>;
@@ -45,9 +45,10 @@ export async function watchlistHandler(
           signal: s.signal,
           confidence: s.confidence,
           priceAtSignal: s.priceAtSignal,
-          change1h: s.change1h,
-          change6h: s.change6h,
-          change24h: s.change24h,
+          // Convert numbers to strings to satisfy frontend .startsWith()
+          change1h: String(s.change1h || "0"),
+          change6h: String(s.change6h || "0"),
+          change24h: String(s.change24h || "0"),
           currentPrice: latestPrice?.priceUSD || s.priceAtSignal,
           generatedAt: s.timestamp,
         };
