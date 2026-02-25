@@ -37,6 +37,7 @@ export async function watchlistHandler(
           change1h: s.change1h ?? 0,
           change6h: s.change6h ?? 0,
           change24h: s.change24h ?? 0,
+          aiReport: s.aiReport,
           currentPrice: latestPrice?.priceUSD || s.priceAtSignal,
           generatedAt: s.timestamp,
         };
