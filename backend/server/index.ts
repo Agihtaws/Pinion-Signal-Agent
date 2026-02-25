@@ -108,7 +108,7 @@ app.get("/test/data", (req, res) => {
       readSignalHistory,
       readEarnings,
       readAgentRuns,
-    } = require("../agent/storage.js");
+    } = require("../agent/storage");
 
     res.json({
       prices: readPriceHistory(),
