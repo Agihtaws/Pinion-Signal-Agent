@@ -69,7 +69,8 @@ export function LiveTicker({
   const tickerItems = [...items, ...items, ...items];
 
   return (
-    <div className="w-full overflow-hidden border-b border-border bg-surface/50 py-2">
+    
+    <div suppressHydrationWarning className="w-full overflow-hidden border-b border-border bg-surface/50 py-2">
       <div
         className="flex items-center gap-8 whitespace-nowrap"
         style={{ transform: `translateX(${offset}px)`, transition: "none" }}
