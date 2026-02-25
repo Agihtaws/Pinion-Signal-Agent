@@ -51,6 +51,7 @@ export async function signalHandler(
       change1h: signal.change1h ?? 0,
       change6h: signal.change6h ?? 0,
       change24h: signal.change24h ?? 0,
+      aiReport: signal.aiReport, 
       currentPrice: latestPrice?.priceUSD || signal.priceAtSignal,
       currentChange24h: latestPrice?.change24h ?? null,
       generatedAt: signal.timestamp,
