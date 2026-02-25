@@ -12,14 +12,15 @@ import { LiveTicker } from "@/components/LiveTicker";
 const AGENT_WALLET = process.env.NEXT_PUBLIC_AGENT_WALLET || "";
 const TOKENS = ["ETH", "WETH", "CBETH"];
 
+// Fixed the Signal interface: the SignalCard component expects change fields to be strings
 interface Signal {
   token: string;
   signal: "BUY" | "HOLD" | "SELL";
   confidence: number;
   priceAtSignal: number;
-  change1h: number;
-  change6h: number;
-  change24h: number;
+  change1h: string;
+  change6h: string;
+  change24h: string;
   aiReport: string;
   timestamp: string;
 }
@@ -96,12 +97,11 @@ export default function Dashboard() {
 
   function getLatestSignal(token: string): Signal | null {
     const history = signals.find((s) => s.token === token);
-    return history?.signals?.[0] || null;
+    return (history?.signals?.[0] as Signal) || null;
   }
 
   return (
     <div className="min-h-screen bg-background">
-
       {/* grid background */}
       <div className="fixed inset-0 bg-grid-pattern bg-grid opacity-20 pointer-events-none" />
 
@@ -111,7 +111,6 @@ export default function Dashboard() {
       <LiveTicker prices={prices} signals={signals} />
 
       <main className="relative z-10 max-w-screen-xl mx-auto px-4 py-6">
-
         {/* page title */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -140,9 +139,9 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             {[
-              { path: "/signal/ETH", price: "$0.05" },
-              { path: "/report/ETH", price: "$0.10" },
-              { path: "/watchlist", price: "$0.03" },
+              { path: "/signal/ETH", price: "0.05 dollars" },
+              { path: "/report/ETH", price: "0.10 dollars" },
+              { path: "/watchlist", price: "0.03 dollars" },
             ].map((ep) => (
               <div key={ep.path} className="flex items-center gap-1.5">
                 <code className="font-mono text-2xs text-text-secondary bg-surface px-2 py-0.5 rounded border border-border">
@@ -170,7 +169,6 @@ export default function Dashboard() {
 
         {/* main content grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
           {/* left col — chart + feed */}
           <div className="lg:col-span-2 space-y-4">
             <PriceChart prices={prices} loading={loading} />
@@ -191,25 +189,25 @@ export default function Dashboard() {
 
         {/* footer */}
         <footer className="mt-8 pt-4 border-t border-border flex items-center justify-between">
-  <div className="flex items-center gap-3">
-    <span className="font-mono text-2xs text-text-muted">
-      Built on PinionOS x402
-    </span>
-    <span className="font-mono text-2xs text-text-muted">·</span>
-    <span className="font-mono text-2xs text-text-muted">
-      Base Sepolia
-    </span>
-  </div>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-2xs text-text-muted">
+              Built on PinionOS x402
+            </span>
+            <span className="font-mono text-2xs text-text-muted">·</span>
+            <span className="font-mono text-2xs text-text-muted">
+              Base Sepolia
+            </span>
+          </div>
 
-  <a
-    href="https://github.com/chu2bard/pinion-os"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="font-mono text-2xs text-text-muted hover:text-green transition-colors"
-  >
-    PinionOS GitHub ↗
-  </a>
-</footer>
+          <a
+            href="https://github.com/chu2bard/pinion-os"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-2xs text-text-muted hover:text-green transition-colors"
+          >
+            PinionOS GitHub ↗
+          </a>
+        </footer>
       </main>
     </div>
   );
