@@ -26,12 +26,13 @@ export interface Signal {
   signal: SignalType;     // BUY, HOLD, SELL
   confidence: number;     // 0 to 100
   priceAtSignal: number;  // USD price when signal was generated
-  change1h: number;       // % price change over last 1 hour
-  change6h: number;       // % price change over last 6 hours
-  change24h: number;      // % price change over last 24 hours
+  change1h: string;       // now string (was number)
+  change6h: string;       // now string (was number)
+  change24h: string;      // now string (was number)
   aiReport: string;       // Gemini generated analysis paragraph
   timestamp: string;      // ISO string
 }
+
 
 export interface SignalHistory {
   token: string;
