@@ -38,9 +38,10 @@ export async function generateAnalysis(
     ? `${SYSTEM_PROMPT}\n\nAdditional context:\n${systemContext}\n\nUser request:\n${prompt}`
     : `${SYSTEM_PROMPT}\n\nUser request:\n${prompt}`;
 
+  // Using gemini-2.5-flash as verified by your curl
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: fullPrompt,
+    contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
   });
 
   const text = response.text;
@@ -73,11 +74,11 @@ export async function generateMarketAnalysis(
   const prompt = `
 Analyze the following ${snapshot.token} price data and provide a market signal.
 
-Current price: $${snapshot.currentPrice.toFixed(2)}
+Current price: USD ${snapshot.currentPrice.toFixed(2)}
 1-hour change: ${snapshot.change1h >= 0 ? "+" : ""}${snapshot.change1h.toFixed(2)}%
 6-hour change: ${snapshot.change6h >= 0 ? "+" : ""}${snapshot.change6h.toFixed(2)}%
 24-hour change: ${snapshot.change24h >= 0 ? "+" : ""}${snapshot.change24h.toFixed(2)}%
-Recent price history (oldest to newest): ${snapshot.priceHistory.map((p) => "$" + p.toFixed(2)).join(", ")}
+Recent price history (oldest to newest): ${snapshot.priceHistory.map((p) => "USD " + p.toFixed(2)).join(", ")}
 
 Based on this data, provide:
 1. Your market analysis report (follow the system format)
@@ -103,9 +104,9 @@ CONFIDENCE: 75
     : raw.trim();
 
   const signalRaw = signalMatch ? signalMatch[1].trim() : "HOLD";
-  const signal = ["BUY", "HOLD", "SELL"].includes(signalRaw)
-    ? (signalRaw as "BUY" | "HOLD" | "SELL")
-    : "HOLD";
+  const signal = (["BUY", "HOLD", "SELL"].includes(signalRaw)
+    ? signalRaw
+    : "HOLD") as "BUY" | "HOLD" | "SELL";
 
   const confidenceRaw = confidenceMatch
     ? parseInt(confidenceMatch[1], 10)
