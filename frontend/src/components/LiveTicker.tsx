@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 interface TickerItem {
   token: string;
   price: number;
-  change24h: string | null;
+  change24h: number | null;
   signal: "BUY" | "HOLD" | "SELL" | null;
 }
 
 interface PriceHistory {
   token: string;
-  entries: { priceUSD: number; change24h: string | null }[];
+  entries: { priceUSD: number; change24h: number | null }[];
 }
 
 interface SignalHistory {
@@ -43,7 +43,7 @@ export function LiveTicker({
       return {
         token,
         price: ph?.entries?.[0]?.priceUSD || 0,
-        change24h: ph?.entries?.[0]?.change24h || null,
+        change24h: ph?.entries?.[0]?.change24h ?? null,
         signal: sh?.signals?.[0]?.signal || null,
       };
     });
@@ -69,7 +69,6 @@ export function LiveTicker({
   const tickerItems = [...items, ...items, ...items];
 
   return (
-    
     <div suppressHydrationWarning className="w-full overflow-hidden border-b border-border bg-surface/50 py-2">
       <div
         className="flex items-center gap-8 whitespace-nowrap"
@@ -88,24 +87,24 @@ export function LiveTicker({
             {/* price */}
             <span className="font-mono text-xs text-text-secondary">
               {item.price > 0
-                ? `$${item.price.toLocaleString("en-US", {
+                ? `USD ${item.price.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}`
                 : "—"}
             </span>
 
-            {/* 24h change */}
-            {item.change24h && (
+            {/* 24h change - Fixed .startsWith error by treating change24h as a number */}
+            {item.change24h !== null && (
               <span
                 className={cn(
                   "font-mono text-2xs",
-                  item.change24h.startsWith("-")
+                  item.change24h < 0
                     ? "text-red"
                     : "text-green"
                 )}
               >
-                {item.change24h}
+                {item.change24h > 0 ? "+" : ""}{item.change24h.toFixed(2)}%
               </span>
             )}
 
