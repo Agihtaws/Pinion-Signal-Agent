@@ -1,11 +1,12 @@
 // skills/price.ts
+// fetches real token prices
+// primary: CoinGecko (free, no key)
+// fallback: CoinCap (free, no key) — kicks in if CoinGecko blocks us
 
 import type { Request, Response } from "express";
-import type { PriceSkillData } from "../shared/types";
 
 // ── Token Maps ────────────────────────────────────────────────────────────────
 
-// CoinGecko token ID mapping
 const COINGECKO_IDS: Record<string, string> = {
   ETH: "ethereum",
   WETH: "weth",
@@ -15,200 +16,201 @@ const COINGECKO_IDS: Record<string, string> = {
   USDT: "tether",
 };
 
-// Base mainnet contract addresses for reference
-const TOKEN_ADDRESSES: Record<string, string> = {
-  ETH: "0x4200000000000000000000000000000000000006",
-  WETH: "0x4200000000000000000000000000000000000006",
-  USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  USDT: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
-  DAI: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
-  CBETH: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
+const COINCAP_IDS: Record<string, string> = {
+  ETH: "ethereum",
+  WETH: "ethereum", // CoinCap doesn't have WETH separately, use ETH price
+  CBETH: "ethereum", // same fallback
+  USDC: "usd-coin",
+  DAI: "multi-collateral-dai",
+  USDT: "tether",
 };
 
-// ── CoinGecko Fetcher ─────────────────────────────────────────────────────────
+// ── Headers ───────────────────────────────────────────────────────────────────
 
-async function fetchCoinGeckoPrice(geckoId: string): Promise<{
-  priceUSD: number;
-  change24h: string | null;
-} | null> {
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (compatible; PinionSignalAgent/1.0)",
+  "Accept": "application/json",
+};
+
+// ── CoinGecko Fetch ───────────────────────────────────────────────────────────
+
+async function fetchFromCoinGecko(
+  symbol: string
+): Promise<{ priceUSD: number; change24h: number } | null> {
   try {
+    const geckoId = COINGECKO_IDS[symbol.toUpperCase()];
+    if (!geckoId) return null;
+
     const url =
       `https://api.coingecko.com/api/v3/simple/price` +
       `?ids=${geckoId}&vs_currencies=usd&include_24hr_change=true`;
 
     const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "pinion-signal-agent/1.0",
-      },
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
-      console.error(
-        `[price] CoinGecko returned ${res.status} for ${geckoId}`
-      );
+      console.warn(`[price] CoinGecko returned ${res.status} for ${symbol}`);
       return null;
     }
 
-    const data: any = await res.json();
+    const data = await res.json();
+    const entry = data[geckoId];
 
-    if (!data[geckoId] || !data[geckoId].usd) {
-      console.error(`[price] no data for ${geckoId} in CoinGecko response`);
-      return null;
-    }
-
-    const change = data[geckoId].usd_24h_change;
+    if (!entry?.usd) return null;
 
     return {
-      priceUSD: data[geckoId].usd,
-      change24h: change != null ? change.toFixed(2) + "%" : null,
+      priceUSD: entry.usd,
+      change24h: entry.usd_24h_change || 0,
     };
   } catch (err: any) {
-    console.error(`[price] CoinGecko fetch error:`, err.message);
+    console.warn(`[price] CoinGecko failed for ${symbol}: ${err.message}`);
     return null;
   }
 }
 
-// ── Contract Address Fetcher (via CoinGecko contract endpoint) ────────────────
+// ── CoinCap Fallback ──────────────────────────────────────────────────────────
 
-async function fetchPriceByAddress(address: string): Promise<{
-  priceUSD: number;
-  change24h: string | null;
-} | null> {
+async function fetchFromCoinCap(
+  symbol: string
+): Promise<{ priceUSD: number; change24h: number } | null> {
+  try {
+    const capId = COINCAP_IDS[symbol.toUpperCase()];
+    if (!capId) return null;
+
+    const url = `https://api.coincap.io/v2/assets/${capId}`;
+
+    const res = await fetch(url, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      console.warn(`[price] CoinCap returned ${res.status} for ${symbol}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const asset = data?.data;
+
+    if (!asset?.priceUsd) return null;
+
+    return {
+      priceUSD: parseFloat(asset.priceUsd),
+      change24h: parseFloat(asset.changePercent24Hr || "0"),
+    };
+  } catch (err: any) {
+    console.warn(`[price] CoinCap failed for ${symbol}: ${err.message}`);
+    return null;
+  }
+}
+
+// ── CoinGecko by Contract Address ─────────────────────────────────────────────
+
+async function fetchByAddress(
+  address: string
+): Promise<{ priceUSD: number; change24h: number } | null> {
   try {
     const url =
       `https://api.coingecko.com/api/v3/simple/token_price/base` +
-      `?contract_addresses=${address.toLowerCase()}` +
-      `&vs_currencies=usd&include_24hr_change=true`;
+      `?contract_addresses=${address}&vs_currencies=usd&include_24hr_change=true`;
 
     const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "pinion-signal-agent/1.0",
-      },
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (!res.ok) {
-      console.error(
-        `[price] CoinGecko contract endpoint returned ${res.status}`
-      );
-      return null;
-    }
+    if (!res.ok) return null;
 
-    const data: any = await res.json();
-    const key = address.toLowerCase();
-
-    if (!data[key] || !data[key].usd) {
-      console.error(`[price] no contract price data for ${address}`);
-      return null;
-    }
-
-    const change = data[key].usd_24h_change;
+    const data = await res.json();
+    const entry = data[address.toLowerCase()];
+    if (!entry?.usd) return null;
 
     return {
-      priceUSD: data[key].usd,
-      change24h: change != null ? change.toFixed(2) + "%" : null,
+      priceUSD: entry.usd,
+      change24h: entry.usd_24h_change || 0,
     };
-  } catch (err: any) {
-    console.error(`[price] contract price fetch error:`, err.message);
+  } catch {
     return null;
   }
 }
 
-// ── Main Handler ──────────────────────────────────────────────────────────────
+// ── Main Fetch With Fallback ──────────────────────────────────────────────────
 
-export async function priceHandler(req: Request, res: Response): Promise<void> {
-  try {
-    const tokenInput = (req.params.token as string).trim();
-    const tokenUpper = tokenInput.toUpperCase();
+export async function fetchPrice(symbol: string): Promise<{
+  priceUSD: number;
+  change24h: number;
+  source: string;
+  symbol: string;
+} | null> {
+  const upper = symbol.toUpperCase();
 
-    // check if input is a contract address
-    const isAddress = /^0x[0-9a-fA-F]{40}$/i.test(tokenInput);
-
-    let priceData: { priceUSD: number; change24h: string | null } | null = null;
-    let resolvedToken = tokenUpper;
-
-    if (isAddress) {
-      // fetch by contract address directly
-      priceData = await fetchPriceByAddress(tokenInput);
-      resolvedToken = tokenInput;
-    } else {
-      // fetch by symbol via CoinGecko ID
-      const geckoId = COINGECKO_IDS[tokenUpper];
-
-      if (!geckoId) {
-        res.status(400).json({
-          error: `unsupported token: ${tokenInput}`,
-          supported: Object.keys(COINGECKO_IDS),
-          note: "you can also pass any Base contract address (0x...)",
-        });
-        return;
-      }
-
-      priceData = await fetchCoinGeckoPrice(geckoId);
+  // handle contract address directly
+  if (symbol.startsWith("0x")) {
+    const result = await fetchByAddress(symbol);
+    if (result) {
+      return { ...result, source: "coingecko", symbol };
     }
+    return null;
+  }
 
-    if (!priceData) {
-      res.status(502).json({
-        error: "price data unavailable",
-        token: resolvedToken,
-        note: "CoinGecko may be rate limiting. Try again in a moment.",
+  // try CoinGecko first
+  console.log(`[price] fetching ${upper} from CoinGecko...`);
+  const geckoResult = await fetchFromCoinGecko(upper);
+  if (geckoResult) {
+    console.log(
+      `[price] ${upper} from CoinGecko — $${geckoResult.priceUSD.toFixed(2)}`
+    );
+    return { ...geckoResult, source: "coingecko", symbol: upper };
+  }
+
+  // fallback to CoinCap
+  console.log(`[price] CoinGecko failed, trying CoinCap for ${upper}...`);
+  const capResult = await fetchFromCoinCap(upper);
+  if (capResult) {
+    console.log(
+      `[price] ${upper} from CoinCap — $${capResult.priceUSD.toFixed(2)}`
+    );
+    return { ...capResult, source: "coincap", symbol: upper };
+  }
+
+  console.error(`[price] both sources failed for ${upper}`);
+  return null;
+}
+
+// ── HTTP Handler ──────────────────────────────────────────────────────────────
+
+export async function priceHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const token = (req.params.token as string).toUpperCase().trim();
+
+    const result = await fetchPrice(token);
+
+    if (!result) {
+      res.status(404).json({
+        error: `price not available for ${token}`,
+        supported: Object.keys(COINGECKO_IDS),
+        note: "also accepts Base contract addresses starting with 0x",
       });
       return;
     }
 
-    const response: PriceSkillData = {
-      token: resolvedToken,
-      network: process.env.PINION_NETWORK || "base-sepolia",
-      priceUSD: priceData.priceUSD,
-      change24h: priceData.change24h,
-      source: "coingecko",
+    res.json({
+      token: result.symbol,
+      priceUSD: result.priceUSD,
+      change24h: `${result.change24h >= 0 ? "+" : ""}${result.change24h.toFixed(2)}%`,
+      source: result.source,
       timestamp: new Date().toISOString(),
-    };
-
-    console.log(
-      `[price] ${resolvedToken} = USD ${priceData.priceUSD} ` +
-      `(${priceData.change24h || "no change data"})`
-    );
-
-    res.json(response);
+    });
   } catch (err: any) {
-    console.error("[price] unexpected error:", err.message);
+    console.error("[price] handler error:", err.message);
     res.status(500).json({
       error: "failed to fetch price",
       details: err.message,
     });
   }
 }
-
-// ── Standalone Fetcher (used by agent internally) ─────────────────────────────
-// agent calls this directly without going through HTTP
-
-export async function fetchPrice(token: string): Promise<{
-  priceUSD: number;
-  change24h: string | null;
-  source: string;
-} | null> {
-  const tokenUpper = token.toUpperCase();
-  const isAddress = /^0x[0-9a-fA-F]{40}$/i.test(token);
-
-  let result: { priceUSD: number; change24h: string | null } | null = null;
-
-  if (isAddress) {
-    result = await fetchPriceByAddress(token);
-  } else {
-    const geckoId = COINGECKO_IDS[tokenUpper];
-    if (!geckoId) return null;
-    result = await fetchCoinGeckoPrice(geckoId);
-  }
-
-  if (!result) return null;
-
-  return {
-    priceUSD: result.priceUSD,
-    change24h: result.change24h,
-    source: "coingecko",
-  };
-}
-
-export { TOKEN_ADDRESSES, COINGECKO_IDS };
