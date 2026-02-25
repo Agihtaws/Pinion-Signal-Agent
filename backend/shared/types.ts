@@ -203,6 +203,7 @@ export interface SignalEndpointResponse {
   change1h: number;
   change6h: number;
   change24h: number;
+  aiReport: string;
   generatedAt: string;
 }
 
